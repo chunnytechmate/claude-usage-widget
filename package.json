@@ -1,0 +1,16 @@
+{
+  "name": "claude-usage-widget",
+  "version": "1.0.0",
+  "description": "Horizontal Windows taskbar widget showing real-time rate-limit usage for Claude and Z.AI",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "setup": "node scripts/setup.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}
