@@ -58,7 +58,9 @@ npm start
 `npm run setup` copies `.env.example` → `.env` (if you don't already have one), then
 reports which providers are ready so you know at a glance whether to run **Claude only**,
 **Z.AI only**, or **both**. Claude needs no key (it reuses Claude Code's OAuth token);
-Z.AI needs `ZAI_API_KEY` in your `.env` (or as an env var).
+Z.AI needs `ZAI_API_KEY` in your `.env` (or as an env var). On Windows it also drops a
+**Claude Usage Widget** shortcut on your Desktop — double-click to launch (no console
+window).
 
 ## Run
 
@@ -129,3 +131,5 @@ Settings persist to `overlay-config.json` in Electron's `userData` folder
 | `src/preload.js` | contextBridge IPC surface (incl. `setSize` auto-width) |
 | `src/icon.js`    | embedded tray icon |
 | `src/renderer/`  | the strip UI — `index.html`, `styles.css`, `renderer.js` |
+| `scripts/setup.js` | `npm run setup` — creates `.env`, desktop shortcut, provider readiness |
+| `.env.example`   | template for your gitignored `.env` (set `ZAI_API_KEY`) |

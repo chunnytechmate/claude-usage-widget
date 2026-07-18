@@ -9,6 +9,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const ENV = path.join(ROOT, '.env');
@@ -39,6 +40,46 @@ function status(label, ok, hint) {
   if (!ok && hint) console.log(dim(`        ${hint}`));
 }
 
+// Create a Desktop shortcut that launches the widget via start-overlay.vbs (silent,
+// no console window), with the bundled app icon. Windows-only; no-op elsewhere.
+// Runs during setup so a fresh install gets a clickable launcher automatically.
+function createWindowsShortcut() {
+  if (process.platform !== 'win32') {
+    console.log(`  ${yellow('! skip')}    desktop shortcut (Windows-only)`);
+    return;
+  }
+  const vbs = path.join(ROOT, 'start-overlay.vbs');
+  const ico = path.join(ROOT, 'src', 'assets', 'app.ico');
+  if (!fs.existsSync(vbs)) {
+    console.log(`  ${yellow('! skip')}    desktop shortcut (start-overlay.vbs not found)`);
+    return;
+  }
+  // WScript.Shell COM builds the .lnk. GetFolderPath('Desktop') follows OneDrive /
+  // folder-redirection so the shortcut lands on the real desktop. Single quotes in
+  // paths are escaped by doubling ('' ), per PowerShell single-quoted-string rules.
+  const q = (p) => p.replace(/'/g, "''");
+  const script = [
+    `$ErrorActionPreference='Stop'`,
+    `$ws=New-Object -ComObject WScript.Shell`,
+    `$lnk=[Environment]::GetFolderPath('Desktop')+'\\Claude Usage Widget.lnk'`,
+    `$s=$ws.CreateShortcut($lnk)`,
+    `$s.TargetPath='${q(vbs)}'`,
+    `$s.WorkingDirectory='${q(ROOT)}'`,
+    `$s.IconLocation='${q(ico)},0'`,
+    `$s.Description='Claude + Z.AI usage widget'`,
+    `$s.Save()`,
+    `Write-Output $lnk`,
+  ].join(';');
+  try {
+    const out = execFileSync('powershell', ['-NoProfile', '-Command', script], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    }).trim();
+    console.log(`  ${green('✓ shortcut')} ${out}`);
+  } catch (e) {
+    console.log(`  ${red('! failed')}  desktop shortcut — ${(e.message || '').split('\n')[0]}`);
+  }
+}
+
 console.log(bold('\nclaude-usage-widget — setup\n'));
 
 // 1) dependencies
@@ -60,7 +101,10 @@ if (!fs.existsSync(ENV)) {
   console.log(`  ${green('✓ exists')}   .env`);
 }
 
-// 3) provider readiness
+// 3) desktop launcher (Windows) — double-click to start the widget
+createWindowsShortcut();
+
+// 4) provider readiness
 const envVals = parseDotenv(ENV);
 const zaiKey = (process.env.ZAI_API_KEY || envVals.ZAI_API_KEY || '').trim();
 const hasClaude = fs.existsSync(CLAUDE_CRED);
@@ -79,6 +123,7 @@ console.log(`  ${zaiKey ? green('ready') : red('no')}      Z.AI only`);
 if (!both) console.log(dim('  * add the missing piece above to unlock this mode'));
 
 console.log(bold('\nNext'));
+console.log(`  Desktop shortcut     ${dim('# double-click "Claude Usage Widget"')}`);
 console.log(`  npm start            ${dim('# launch the widget')}`);
 console.log(`  start-overlay.vbs    ${dim('# launch with no console window')}`);
 console.log(`  Ctrl+Shift+U         ${dim('# show / hide the overlay')}`);
