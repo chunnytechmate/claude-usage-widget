@@ -80,6 +80,49 @@ function createWindowsShortcut() {
   }
 }
 
+// Create a freedesktop .desktop entry so the widget shows up in the app menu
+// (GNOME/KDE/XFCE/Cinnamon) and, best-effort, on the Desktop. Runs during setup
+// so a fresh Linux install gets a clickable launcher automatically.
+function createLinuxDesktopEntry() {
+  if (process.platform !== 'linux') return;
+  const startJs = path.join(ROOT, 'scripts', 'start.js');
+  const icon = path.join(ROOT, 'src', 'assets', 'tray.png');
+  const entry = [
+    '[Desktop Entry]',
+    'Type=Application',
+    'Name=Claude Usage Widget',
+    `Exec=${process.execPath} ${startJs}`,
+    `Path=${ROOT}`,
+    `Icon=${icon}`,
+    'Terminal=false',
+    'Categories=Utility;',
+    'Comment=Real-time rate-limit usage for Claude and Z.AI',
+  ].join('\n') + '\n';
+
+  const writeEntry = (file) => { fs.writeFileSync(file, entry); fs.chmodSync(file, 0o755); };
+
+  // App menu entry (~/.local/share/applications/...) — reliable across DEs.
+  const dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share');
+  const appsDir = path.join(dataHome, 'applications');
+  try {
+    fs.mkdirSync(appsDir, { recursive: true });
+    const appEntry = path.join(appsDir, 'claude-usage-widget.desktop');
+    writeEntry(appEntry);
+    console.log(`  ${green('✓ launcher')} ${appEntry}`);
+  } catch (e) {
+    console.log(`  ${red('! failed')}  app-menu entry — ${(e.message || '').split('\n')[0]}`);
+  }
+
+  // Best-effort desktop copy (shown by KDE/XFCE/Cinnamon; GNOME needs a desktop-icons extension).
+  const desktop = path.join(os.homedir(), 'Desktop');
+  if (fs.existsSync(desktop)) {
+    try {
+      writeEntry(path.join(desktop, 'claude-usage-widget.desktop'));
+      console.log(`  ${green('✓ launcher')} ${path.join(desktop, 'claude-usage-widget.desktop')}`);
+    } catch { /* non-fatal */ }
+  }
+}
+
 console.log(bold('\nclaude-usage-widget — setup\n'));
 
 // 1) dependencies
@@ -101,8 +144,10 @@ if (!fs.existsSync(ENV)) {
   console.log(`  ${green('✓ exists')}   .env`);
 }
 
-// 3) desktop launcher (Windows) — double-click to start the widget
-createWindowsShortcut();
+// 3) desktop launcher — double-click (Windows) or app menu (Linux) to start the widget
+if (process.platform === 'win32') createWindowsShortcut();
+else if (process.platform === 'linux') createLinuxDesktopEntry();
+else console.log(`  ${yellow('! skip')}    desktop launcher (unsupported on ${process.platform})`);
 
 // 4) provider readiness
 const envVals = parseDotenv(ENV);
@@ -123,9 +168,15 @@ console.log(`  ${zaiKey ? green('ready') : red('no')}      Z.AI only`);
 if (!both) console.log(dim('  * add the missing piece above to unlock this mode'));
 
 console.log(bold('\nNext'));
-console.log(`  Desktop shortcut     ${dim('# double-click "Claude Usage Widget"')}`);
 console.log(`  npm start            ${dim('# launch the widget')}`);
-console.log(`  start-overlay.vbs    ${dim('# launch with no console window')}`);
+if (process.platform === 'win32') {
+  console.log(`  Desktop shortcut     ${dim('# double-click "Claude Usage Widget"')}`);
+  console.log(`  start-overlay.vbs    ${dim('# launch with no console window')}`);
+} else if (process.platform === 'linux') {
+  console.log(`  App menu             ${dim('# find "Claude Usage Widget" in your applications')}`);
+  console.log(`  start-overlay.sh     ${dim('# launch with no terminal window')}`);
+  console.log(`  Tray → Launch at login ${dim('# start the widget when you sign in')}`);
+}
 console.log(`  Ctrl+Shift+U         ${dim('# show / hide the overlay')}`);
 if (!zaiKey) console.log(yellow(`\n  → edit ${ENV} and add your ZAI_API_KEY to enable Z.AI.\n`));
 console.log('');

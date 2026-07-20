@@ -4,7 +4,9 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, globalShor
 const config = require('./config');
 const { fetchUsage } = require('./usage');
 const { fetchZaiUsage } = require('./zai');
+const { getActiveModel } = require('./active-model');
 const { trayIconDataUrl } = require('./icon');
+const autostart = require('./autostart');
 
 let win = null;
 let tray = null;
@@ -21,7 +23,7 @@ function defaultPos() {
   return { x: wa.x + wa.width - WIN_WIDTH - 24, y: wa.y + 24 };
 }
 
-// Docked position: bottom-right, sitting flush just above the taskbar. The
+// Docked position: bottom-right, sitting flush just above the panel/taskbar. The
 // bottom edge pins to the work-area bottom so the widget grows upward as more
 // rows render, the way claude-usage-widget's essential mode rests on the bar.
 function taskbarPos() {
@@ -96,7 +98,7 @@ function rebuildTrayMenu() {
     { label: 'Refresh now', click: () => poll(true) },
     { type: 'separator' },
     {
-      label: 'Dock to taskbar',
+      label: 'Dock to panel',
       type: 'checkbox',
       checked: cfg.taskbarMode,
       click: (item) => {
@@ -162,12 +164,12 @@ function rebuildTrayMenu() {
       ],
     },
     {
-      label: 'Launch on Windows startup',
+      label: 'Launch at login',
       type: 'checkbox',
-      checked: cfg.launchOnStartup,
+      checked: autostart.isEnabled(),
       click: (item) => {
         cfg.launchOnStartup = item.checked;
-        app.setLoginItemSettings({ openAtLogin: item.checked });
+        autostart.setEnabled(item.checked);
         config.save(cfg);
       },
     },
@@ -241,7 +243,10 @@ async function poll() {
     if (cfg.claudeEnabled) jobs.push(fetchProvider('claude', 'Claude', () => fetchUsage()));
     if (cfg.zaiEnabled) jobs.push(fetchProvider('zai', 'Z.AI', () => fetchZaiUsage(cfg)));
     const providers = await Promise.all(jobs);
-    win.webContents.send('usage-update', { providers, fetchedAt: Date.now() });
+    // Active model is detected per-poll by reading Claude Code's newest session
+    // transcript, so it tracks model switches without restarting the widget.
+    const activeModel = getActiveModel();
+    win.webContents.send('usage-update', { providers, fetchedAt: Date.now(), activeModel });
   } finally {
     pollInFlight = false;
   }
@@ -301,8 +306,8 @@ if (!gotLock) {
     startPolling();
     // Keep the docked widget on the taskbar across monitor / resolution changes.
     screen.on('display-metrics-changed', () => { if (cfg.taskbarMode) reposition(); });
-    // Reflect saved startup preference.
-    app.setLoginItemSettings({ openAtLogin: cfg.launchOnStartup });
+    // Reflect saved startup preference (XDG autostart on Linux, login item elsewhere).
+    autostart.setEnabled(cfg.launchOnStartup);
     // Global hotkey to show/hide the overlay (works even when fully hidden).
     globalShortcut.register('CommandOrControl+Shift+U', () => toggleShow());
   });

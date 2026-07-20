@@ -81,6 +81,7 @@ function normalize(data, auth) {
         rows.push({
           key: `scoped:${name}`,
           label: name,
+          modelId: lim.scope.model.id || lim.scope.model.value || null,
           percent: Math.round(lim.percent || 0),
           resetsAt: lim.resets_at || null,
           severity: lim.severity || severityFor(lim.percent || 0),

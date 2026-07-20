@@ -108,3 +108,34 @@ html, body {
 
 /* Collapsed: hide cells, keep brand + buttons only (slim title chip). */
 body.collapsed .cells { display: none; }
+
+/* Active-model pill: the model Claude Code is using right now, auto-detected.
+ * Sits right after the brand; hidden until a model is detected. */
+.active-pill {
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+  background: rgba(217, 119, 87, 0.16);
+  border: 1px solid rgba(217, 119, 87, 0.4);
+  border-radius: 999px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* When the active model matches a shown usage row, emphasize that row and tag it. */
+.stack-row.row-active .cell-label,
+.cell.is-active .cell-label { color: var(--text); font-weight: 600; }
+.active-badge {
+  font-size: 8px; font-weight: 700; letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(217, 119, 87, 0.45);
+  border-radius: 4px;
+  padding: 0 4px;
+  line-height: 1.5;
+}

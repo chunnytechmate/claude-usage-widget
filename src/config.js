@@ -16,7 +16,7 @@ const DEFAULTS = {
   pollSeconds: 180,
   launchOnStartup: false,
   collapsed: false,      // widget folded down to just its title bar
-  taskbarMode: true,     // dock to bottom-right just above the Windows taskbar
+  taskbarMode: true,     // dock to bottom-right just above the panel/taskbar
   // Providers — toggle each from the tray ("Providers" submenu):
   //   Both / Claude only / Z.AI only. A provider that's off isn't fetched at all.
   claudeEnabled: true,

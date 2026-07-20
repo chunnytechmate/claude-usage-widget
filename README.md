@@ -1,6 +1,6 @@
 # Usage Strip (Claude + Z.AI)
 
-A tiny always-on-top **horizontal strip** that docks just above your Windows taskbar and
+A tiny always-on-top **horizontal strip** that docks just above your taskbar/panel and
 shows real-time rate-limit usage for **Claude** and **Z.AI** side by side — so you never
 have to open a browser tab to check how close you are to the limit.
 
@@ -12,11 +12,15 @@ Electron + plain HTML/CSS/JS and extended with a second provider (Z.AI).
 
 ## Features
 
-- **Lives on the taskbar** — docks to the bottom-right, flush above the Windows taskbar,
-  always on top, out of the way of your work. Toggle from the tray ("Dock to taskbar");
+- **Lives on the panel/taskbar** — docks to the bottom-right, flush above the taskbar or
+  panel, always on top, out of the way of your work. Toggle from the tray ("Dock to panel");
   turn it off to float and drag it anywhere.
 - **Two providers, isolated** — Claude and Z.AI fetch independently, so one being down or
   missing a key never blanks out the other.
+- **Active-model pill** — a pill next to the title shows which Claude Code model you're
+  using right now, auto-detected from your newest session transcript (no setup). When that
+  model is one of the shown limits, its row is tagged **Active**. Updates each poll, so it
+  follows model switches without restarting the widget.
 - **Quiet, readable bars** — thin severity-colored progress bars (green / amber / red) with
   the percentage above. The Weekly + per-model limits collapse into one stacked cell
   (percent only, no bars) to save horizontal space; their shared reset is shown once.
@@ -58,9 +62,9 @@ npm start
 `npm run setup` copies `.env.example` → `.env` (if you don't already have one), then
 reports which providers are ready so you know at a glance whether to run **Claude only**,
 **Z.AI only**, or **both**. Claude needs no key (it reuses Claude Code's OAuth token);
-Z.AI needs `ZAI_API_KEY` in your `.env` (or as an env var). On Windows it also drops a
-**Claude Usage Widget** shortcut on your Desktop — double-click to launch (no console
-window).
+Z.AI needs `ZAI_API_KEY` in your `.env` (or as an env var). It also drops a clickable
+launcher: a **Claude Usage Widget** desktop shortcut on Windows, or an app-menu entry
+(`~/.local/share/applications/…`) on Linux — double-click to launch (no console window).
 
 ## Run
 
@@ -68,9 +72,15 @@ window).
 npm start
 ```
 
-Or double-click **`start-overlay.vbs`** to launch it silently (no console window). It also
-clears `ELECTRON_RUN_AS_NODE`, which some parent shells (including Claude Code's own
-runtime) set and which would otherwise stop Electron from starting a GUI.
+Or launch it silently (no console window):
+
+- **Windows** — double-click **`start-overlay.vbs`**.
+- **Linux** — run **`./start-overlay.sh`**, or open **Claude Usage Widget** from your app
+  menu after `npm run setup`.
+
+Both clear `ELECTRON_RUN_AS_NODE`, which some parent shells (VS Code's remote server,
+Claude Code's own runtime) set and which would otherwise stop Electron from starting a GUI.
+(`npm start` already clears it cross-platform via `scripts/start.js`.)
 
 ## Provider modes
 
@@ -86,21 +96,22 @@ are polled, so each mode "just works" with whatever credentials you have:
 - **↻** refresh now. **–** collapse the strip to just its title chip (click **□** to expand
   again; the state is remembered across restarts).
 - **Tray icon** (right-click) → Refresh, **Providers** (Both / Claude only / Z.AI only),
-  Dock to taskbar (on/off), Click-through, Always on top (forced on while docked), Opacity,
-  Launch on Windows startup, Show / Hide, Quit.
+  Dock to panel (on/off), Click-through, Always on top (forced on while docked), Opacity,
+  Launch at login, Show / Hide, Quit.
 - **Show / hide** the whole overlay: click the tray icon or press **Ctrl+Shift+U** (works
   even when fully hidden).
-- While docked, dragging is disabled so it stays pinned; turn "Dock to taskbar" off to move
+- While docked, dragging is disabled so it stays pinned; turn "Dock to panel" off to move
   it freely (position is remembered).
 
 ## Config
 
 Settings persist to `overlay-config.json` in Electron's `userData` folder
-(`%APPDATA%\claude-usage-widget`). Notable keys:
+(`%APPDATA%\claude-usage-widget` on Windows, `~/.config/claude-usage-widget` on Linux,
+`~/Library/Application Support/claude-usage-widget` on macOS). Notable keys:
 
 | key | default | purpose |
 |-----|---------|---------|
-| `taskbarMode` | `true` | dock to the taskbar bottom-right |
+| `taskbarMode` | `true` | dock to the bottom-right |
 | `opacity` | `0.95` | window opacity (0.3–1.0) |
 | `clickThrough` | `false` | let mouse clicks pass through to windows behind |
 | `alwaysOnTop` | `true` | stay above other windows (forced on while docked) |
@@ -110,7 +121,7 @@ Settings persist to `overlay-config.json` in Electron's `userData` folder
 | `zaiEnabled` | `true` | poll the Z.AI provider |
 | `zaiApiKey` | — | explicit Z.AI key (overrides `.env`) |
 | `zaiEnvPath` | `null` | custom `.env` path; `null` = project-root `.env` |
-| `launchOnStartup` | `false` | start with Windows |
+| `launchOnStartup` | `false` | start at login |
 
 ## Severity colors
 
@@ -124,12 +135,15 @@ Settings persist to `overlay-config.json` in Electron's `userData` folder
 
 | File | Purpose |
 |------|---------|
-| `src/main.js`    | window, tray, taskbar dock, polls both providers, IPC |
+| `src/main.js`    | window, tray, panel/taskbar dock, polls both providers, IPC |
 | `src/usage.js`   | Claude: token read + `/api/oauth/usage` fetch + normalize |
+| `src/active-model.js` | detect the currently-used Claude Code model from the newest session transcript |
 | `src/zai.js`     | Z.AI: key read + quota endpoint fetch + normalize |
 | `src/config.js`  | settings persistence + defaults |
+| `src/autostart.js` | start-at-login (XDG autostart on Linux, login item elsewhere) |
 | `src/preload.js` | contextBridge IPC surface (incl. `setSize` auto-width) |
 | `src/icon.js`    | embedded tray icon |
 | `src/renderer/`  | the strip UI — `index.html`, `styles.css`, `renderer.js` |
-| `scripts/setup.js` | `npm run setup` — creates `.env`, desktop shortcut, provider readiness |
+| `scripts/start.js` | cross-platform launcher (`npm start`) — clears `ELECTRON_RUN_AS_NODE`, Linux sandbox fallback |
+| `scripts/setup.js` | `npm run setup` — creates `.env`, desktop/app-menu launcher, provider readiness |
 | `.env.example`   | template for your gitignored `.env` (set `ZAI_API_KEY`) |

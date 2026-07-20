@@ -33,7 +33,9 @@ window.overlay.onUsage((payload) => {
 
 function render(payload) {
   const providers = payload.providers || [];
+  const am = payload.activeModel || null;
   cellsEl.innerHTML = '';
+  renderActivePill(am);
 
   if (!providers.length) {
     cellsEl.innerHTML = '<div class="empty">No providers</div>';
@@ -42,13 +44,27 @@ function render(payload) {
   }
 
   for (const prov of providers) {
-    const frag = buildProviderCells(prov);
+    const frag = buildProviderCells(prov, am);
     if (frag) cellsEl.appendChild(frag);
   }
   syncSize();
 }
 
-function buildProviderCells(prov) {
+// Active-model pill next to the brand. Hidden when no model could be detected.
+function renderActivePill(am) {
+  const pill = document.getElementById('active-pill');
+  if (!pill) return;
+  if (am && am.label) {
+    pill.textContent = am.label;
+    pill.title = 'Active model: ' + am.id;
+    pill.hidden = false;
+  } else {
+    pill.hidden = true;
+    pill.textContent = '';
+  }
+}
+
+function buildProviderCells(prov, am) {
   const frag = document.createDocumentFragment();
 
   if (!prov.ok) {
@@ -89,9 +105,9 @@ function buildProviderCells(prov) {
         group.push(prov.rows[i]);
         i++;
       }
-      frag.appendChild(buildStackCell(prov, group));
+      frag.appendChild(buildStackCell(prov, group, am));
     } else {
-      frag.appendChild(buildCell(prov, prov.rows[i]));
+      frag.appendChild(buildCell(prov, prov.rows[i], am));
       i++;
     }
   }
@@ -99,15 +115,19 @@ function buildProviderCells(prov) {
 }
 
 // Stacked cell: percents only (no bars), one row per limit, with a single
-// shared reset line taken from the first (Weekly) row.
-function buildStackCell(prov, rows) {
+// shared reset line taken from the first (Weekly) row. A row whose model matches
+// the active one gets an "Active" badge.
+function buildStackCell(prov, rows, am) {
   const cell = el('div', 'cell cell-stack');
   for (const r of rows) {
     const line = el('div', 'stack-row');
+    const active = rowIsActive(r, am);
+    if (active) line.classList.add('row-active');
     const dot = el('span', 'cell-dot');
     dot.style.background = ACCENT[prov.id] || '#888';
     line.appendChild(dot);
     line.appendChild(el('span', 'cell-label', shortLabel(r)));
+    if (active) line.appendChild(el('span', 'active-badge', 'Active'));
     const pct = el('span', 'cell-pct', (r.percent || 0) + '%');
     pct.style.color = colorFor(r.severity);
     line.appendChild(pct);
@@ -118,14 +138,17 @@ function buildStackCell(prov, rows) {
   return cell;
 }
 
-function buildCell(prov, row) {
+function buildCell(prov, row, am) {
   const cell = el('div', 'cell');
+  const active = rowIsActive(row, am);
+  if (active) cell.classList.add('is-active');
 
   const head = el('div', 'cell-head');
   const dot = el('span', 'cell-dot');
   dot.style.background = ACCENT[prov.id] || '#888';
   head.appendChild(dot);
   head.appendChild(el('span', 'cell-label', shortLabel(row)));
+  if (active) head.appendChild(el('span', 'active-badge', 'Active'));
   const pct = el('span', 'cell-pct', (row.percent || 0) + '%');
   pct.style.color = colorFor(row.severity);
   head.appendChild(pct);
@@ -160,6 +183,23 @@ function colorFor(sev) {
   return sev === 'critical' ? 'var(--critical)'
     : sev === 'warning' ? 'var(--warning)'
     : 'var(--normal)';
+}
+
+// Does this usage row correspond to the currently-active model? Match on the
+// friendly label first (most reliable), then on a normalized id (suffix-stripped).
+function rowIsActive(row, am) {
+  if (!am || !am.label) return false;
+  if (row.label && row.label === am.label) return true;
+  if (row.modelId && am.norm && normId(row.modelId) === am.norm) return true;
+  return false;
+}
+
+function normId(id) {
+  return String(id || '')
+    .toLowerCase()
+    .replace(/\[.*?\]$/, '')
+    .replace(/-1m$/, '')
+    .trim();
 }
 
 // Reference-style reset: "reset 22:10 (50min)" same day,
